@@ -15,3 +15,6 @@ gem 'minitest', '~> 5.0'
 gem 'prop_check'
 gem 'rubocop'
 gem 'simplecov'
+
+# https://github.com/socketry/io-stream/pull/new/frozen-error-debug
+gem "io-stream", github: "socketry/io-stream", branch: "frozen-error-debug"
