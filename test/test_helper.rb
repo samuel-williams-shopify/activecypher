@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require 'async/safe'
+Async::Safe.enable!
+
 # Configure Rails Environment
 ENV['RAILS_ENV'] = 'test'
 require 'simplecov'
