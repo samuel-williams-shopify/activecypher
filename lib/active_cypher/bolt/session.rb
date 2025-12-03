@@ -22,6 +22,8 @@ module ActiveCypher
 
         @current_transaction = nil
         @bookmarks = []
+
+        @mutex = Mutex.new
       end
 
       # Executes a Cypher query and returns the result.
@@ -174,30 +176,32 @@ module ActiveCypher
       private
 
       def _execute_transaction_block(mode, db, timeout, metadata, &block)
-        tx = begin_transaction(db: db, access_mode: mode, tx_timeout: timeout, tx_metadata: metadata)
-        begin
-          result = block.call(tx)
-          tx.commit
-          result
-        rescue StandardError => e
-          # On any error, rollback the transaction and re-raise the original exception
+        @mutex.synchronize do
+          tx = begin_transaction(db: db, access_mode: mode, tx_timeout: timeout, tx_metadata: metadata)
           begin
-            tx.rollback
-          rescue StandardError => rollback_error
-            # Log rollback error but continue with the original error
-            puts "Error during rollback: #{rollback_error.message}" if ENV['DEBUG']
-          end
+            result = block.call(tx)
+            tx.commit
+            result
+          rescue StandardError => e
+            # On any error, rollback the transaction and re-raise the original exception
+            begin
+              tx.rollback
+            rescue StandardError => rollback_error
+              # Log rollback error but continue with the original error
+              puts "Error during rollback: #{rollback_error.message}" if ENV['DEBUG']
+            end
 
-          # Reset the connection to ensure it's in a clean state for the next transaction
-          begin
-            @connection.reset!
-          rescue StandardError => reset_error
-            # If reset fails, the connection will be marked non-viable by the pool
-            puts "Error during connection reset: #{reset_error.message}" if ENV['DEBUG']
-          end
+            # Reset the connection to ensure it's in a clean state for the next transaction
+            begin
+              @connection.reset!
+            rescue StandardError => reset_error
+              # If reset fails, the connection will be marked non-viable by the pool
+              puts "Error during connection reset: #{reset_error.message}" if ENV['DEBUG']
+            end
 
-          # Wrap the error in TransactionError to maintain compatibility
-          raise ActiveCypher::TransactionError, e.message
+            # Wrap the error in TransactionError to maintain compatibility
+            raise ActiveCypher::TransactionError, e.message
+          end
         end
       end
 
